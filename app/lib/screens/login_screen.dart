@@ -15,6 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool hidePassword = true;
   bool loading = false;
+  String diagnostic = 'Ожидание входа';
 
   @override
   void dispose() {
@@ -34,14 +35,26 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    setState(() => loading = true);
+    setState(() {
+      loading = true;
+      diagnostic = 'Этап 1: отправка запроса на сервер';
+    });
 
     try {
       final data = await ApiService.login(username, password);
-      final user = data['user'];
-      final name = user is Map ? user['username']?.toString() ?? username : username;
 
       if (!mounted) return;
+      setState(() => diagnostic = 'Этап 2: ответ получен, токен сохранён');
+
+      final user = data['user'];
+      final name = user is Map
+          ? user['username']?.toString() ?? username
+          : username;
+
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (!mounted) return;
+
+      setState(() => diagnostic = 'Этап 3: переход в список чатов');
 
       Navigator.pushReplacement(
         context,
@@ -51,6 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } catch (e) {
       if (!mounted) return;
+      setState(() => diagnostic = 'ОШИБКА: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
       );
@@ -114,6 +128,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       ? const CircularProgressIndicator()
                       : const Text('Войти'),
                 ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                diagnostic,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Color(0xFF00E5D4)),
               ),
             ],
           ),
