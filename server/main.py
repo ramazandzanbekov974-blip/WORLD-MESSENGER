@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
 from auth import register_user, login_user
-from messaging import create_chat, send_message, get_messages
+from messaging import create_chat, send_message, get_messages, get_chats
 
 sessions = {}
 
@@ -72,6 +72,14 @@ class MessengerHandler(BaseHTTPRequestHandler):
                 return
             self.send_json({"user": user})
 
+        elif path == "/chats":
+            user = self.current_user()
+            if not user:
+                self.send_json({"error": "Unauthorized"}, 401)
+                return
+
+            self.send_json({"chats": get_chats(user["id"])})
+
         else:
             match = re.fullmatch(r"/chats/(\d+)/messages", path)
 
@@ -114,8 +122,12 @@ class MessengerHandler(BaseHTTPRequestHandler):
                         {"success": ok, "message": message},
                         201 if ok else 400
                     )
-                except Exception:
-                    self.send_json({"error": "Registration failed"}, 500)
+                except Exception as error:
+                    print("REGISTRATION ERROR:", repr(error), flush=True)
+                    try:
+                        self.send_json({"error": "Registration failed"}, 500)
+                    except BrokenPipeError:
+                        pass
 
             else:
                 try:
@@ -132,8 +144,12 @@ class MessengerHandler(BaseHTTPRequestHandler):
                         "token": token,
                         "user": user
                     })
-                except Exception:
-                    self.send_json({"error": "Login failed"}, 500)
+                except Exception as error:
+                    print("LOGIN ERROR:", repr(error), flush=True)
+                    try:
+                        self.send_json({"error": "Login failed"}, 500)
+                    except BrokenPipeError:
+                        pass
 
             return
 

@@ -87,3 +87,42 @@ def get_messages(chat_id, user_id, limit=50):
         """, (chat_id, limit)).fetchall()
 
         return [dict(row) for row in reversed(rows)]
+
+
+def get_chats(user_id):
+    with get_connection() as conn:
+        rows = conn.execute("""
+            SELECT
+                c.id AS chat_id,
+                other_user.id AS user_id,
+                other_user.username AS username,
+                (
+                    SELECT body
+                    FROM messages
+                    WHERE chat_id = c.id
+                    ORDER BY id DESC
+                    LIMIT 1
+                ) AS last_message,
+                (
+                    SELECT created_at
+                    FROM messages
+                    WHERE chat_id = c.id
+                    ORDER BY id DESC
+                    LIMIT 1
+                ) AS last_message_at
+            FROM chats c
+            JOIN chat_members mine
+                ON mine.chat_id = c.id AND mine.user_id = ?
+            JOIN chat_members other_member
+                ON other_member.chat_id = c.id
+                AND other_member.user_id != mine.user_id
+            JOIN users other_user
+                ON other_user.id = other_member.user_id
+            ORDER BY (
+                SELECT MAX(id)
+                FROM messages
+                WHERE chat_id = c.id
+            ) DESC
+        """, (user_id,)).fetchall()
+
+        return [dict(row) for row in rows]

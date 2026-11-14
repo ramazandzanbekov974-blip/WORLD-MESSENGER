@@ -9,14 +9,16 @@ class ApiService {
     String username,
     String password,
   ) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/register'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'username': username,
-        'password': password,
-      }),
-    );
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/register'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'username': username,
+            'password': password,
+          }),
+        )
+        .timeout(const Duration(seconds: 15));
 
     return _decode(response);
   }
@@ -25,14 +27,16 @@ class ApiService {
     String username,
     String password,
   ) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/login'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'username': username,
-        'password': password,
-      }),
-    );
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/login'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'username': username,
+            'password': password,
+          }),
+        )
+        .timeout(const Duration(seconds: 15));
 
     final data = _decode(response);
     final token = data['token'];
@@ -47,6 +51,34 @@ class ApiService {
     return data;
   }
 
+  static Future<List<Map<String, dynamic>>> getChats() async {
+    final token = await getToken();
+
+    if (token == null || token.isEmpty) {
+      throw Exception('Необходимо войти в аккаунт');
+    }
+
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/chats'),
+          headers: {
+            'Authorization': 'Bearer $token',
+          },
+        )
+        .timeout(const Duration(seconds: 15));
+
+    final data = _decode(response);
+    final chats = data['chats'];
+
+    if (chats is! List) {
+      throw Exception('Некорректный список чатов');
+    }
+
+    return chats
+        .whereType<Map<String, dynamic>>()
+        .toList();
+  }
+
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('auth_token');
@@ -58,18 +90,24 @@ class ApiService {
   }
 
   static Map<String, dynamic> _decode(http.Response response) {
-    final data = jsonDecode(response.body);
+    final dynamic decoded;
 
-    if (data is! Map<String, dynamic>) {
+    try {
+      decoded = jsonDecode(response.body);
+    } catch (_) {
+      throw Exception('Сервер вернул некорректный ответ');
+    }
+
+    if (decoded is! Map<String, dynamic>) {
       throw Exception('Некорректный ответ сервера');
     }
 
     if (response.statusCode >= 400) {
       throw Exception(
-        data['error'] ?? data['message'] ?? 'Ошибка запроса',
+        decoded['error'] ?? decoded['message'] ?? 'Ошибка запроса',
       );
     }
 
-    return data;
+    return decoded;
   }
 }
