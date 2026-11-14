@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
+import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -10,13 +12,51 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final usernameController = TextEditingController();
   final passwordController = TextEditingController();
+
   bool hidePassword = true;
+  bool loading = false;
 
   @override
   void dispose() {
     usernameController.dispose();
     passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> login() async {
+    final username = usernameController.text.trim();
+    final password = passwordController.text;
+
+    if (username.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Заполни все поля')),
+      );
+      return;
+    }
+
+    setState(() => loading = true);
+
+    try {
+      final data = await ApiService.login(username, password);
+      final user = data['user'];
+      final name = user is Map ? user['username']?.toString() ?? username : username;
+
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => HomeScreen(username: name),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
   }
 
   @override
@@ -31,18 +71,11 @@ class _LoginScreenState extends State<LoginScreen> {
           padding: const EdgeInsets.all(28),
           child: Column(
             children: [
-              const Icon(
-                Icons.public,
-                size: 75,
-                color: Color(0xFF00E5D4),
-              ),
+              const Icon(Icons.public, size: 75, color: Color(0xFF00E5D4)),
               const SizedBox(height: 25),
               const Text(
                 'С возвращением!',
-                style: TextStyle(
-                  fontSize: 27,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 27, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 35),
               TextField(
@@ -63,14 +96,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   border: const OutlineInputBorder(),
                   suffixIcon: IconButton(
                     onPressed: () {
-                      setState(() {
-                        hidePassword = !hidePassword;
-                      });
+                      setState(() => hidePassword = !hidePassword);
                     },
                     icon: Icon(
-                      hidePassword
-                          ? Icons.visibility
-                          : Icons.visibility_off,
+                      hidePassword ? Icons.visibility : Icons.visibility_off,
                     ),
                   ),
                 ),
@@ -80,8 +109,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 width: double.infinity,
                 height: 54,
                 child: FilledButton(
-                  onPressed: () {},
-                  child: const Text('Войти'),
+                  onPressed: loading ? null : login,
+                  child: loading
+                      ? const CircularProgressIndicator()
+                      : const Text('Войти'),
                 ),
               ),
             ],

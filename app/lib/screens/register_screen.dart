@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -13,6 +14,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final confirmController = TextEditingController();
 
   bool hidePassword = true;
+  bool loading = false;
 
   @override
   void dispose() {
@@ -20,6 +22,75 @@ class _RegisterScreenState extends State<RegisterScreen> {
     passwordController.dispose();
     confirmController.dispose();
     super.dispose();
+  }
+
+  Future<void> register() async {
+    final username = usernameController.text.trim();
+    final password = passwordController.text;
+    final confirm = confirmController.text;
+
+    if (username.isEmpty || password.isEmpty || confirm.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Заполни все поля')),
+      );
+      return;
+    }
+
+    if (username.length < 3 || username.length > 24 ||
+        !RegExp(r'^[A-Za-z0-9_]+$').hasMatch(username)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Имя: 3–24 символа, только латинские буквы, цифры и _'),
+        ),
+      );
+      return;
+    }
+
+    if (password.length < 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Пароль должен содержать минимум 10 символов')),
+      );
+      return;
+    }
+
+    if (password != confirm) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Пароли не совпадают')),
+      );
+      return;
+    }
+
+    setState(() => loading = true);
+
+    try {
+      final data = await ApiService.register(username, password);
+
+      if (!mounted) return;
+
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Аккаунт создан!'),
+          content: Text(data['message']?.toString() ?? 'Регистрация прошла успешно'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Продолжить'),
+            ),
+          ],
+        ),
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
   }
 
   @override
@@ -34,18 +105,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
           padding: const EdgeInsets.all(28),
           child: Column(
             children: [
-              const Icon(
-                Icons.public,
-                size: 75,
-                color: Color(0xFF00E5D4),
-              ),
+              const Icon(Icons.public, size: 75, color: Color(0xFF00E5D4)),
               const SizedBox(height: 25),
               const Text(
                 'Создать аккаунт',
-                style: TextStyle(
-                  fontSize: 27,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 27, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 30),
               TextField(
@@ -66,14 +130,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   border: const OutlineInputBorder(),
                   suffixIcon: IconButton(
                     onPressed: () {
-                      setState(() {
-                        hidePassword = !hidePassword;
-                      });
+                      setState(() => hidePassword = !hidePassword);
                     },
                     icon: Icon(
-                      hidePassword
-                          ? Icons.visibility
-                          : Icons.visibility_off,
+                      hidePassword ? Icons.visibility : Icons.visibility_off,
                     ),
                   ),
                 ),
@@ -93,8 +153,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 width: double.infinity,
                 height: 54,
                 child: FilledButton(
-                  onPressed: () {},
-                  child: const Text('Создать аккаунт'),
+                  onPressed: loading ? null : register,
+                  child: loading
+                      ? const CircularProgressIndicator()
+                      : const Text('Создать аккаунт'),
                 ),
               ),
             ],

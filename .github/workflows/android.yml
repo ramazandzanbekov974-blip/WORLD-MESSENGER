@@ -27,6 +27,20 @@ jobs:
             /tmp/wm_scaffold
           cp -R /tmp/wm_scaffold/android app/android
 
+      - name: Allow local HTTP for development
+        run: |
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          p = Path("app/android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          s = s.replace(
+              "<application",
+              '<application android:usesCleartextTraffic="true"',
+              1
+          )
+          p.write_text(s)
+          PYTHON
+
       - name: Install dependencies
         working-directory: app
         run: flutter pub get
