@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -9,17 +10,18 @@ class ApiService {
     String username,
     String password,
   ) async {
-    final response = await http
-        .post(
-          Uri.parse('$baseUrl/register'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'username': username,
-            'password': password,
-          }),
-        )
-        .timeout(const Duration(seconds: 15));
+    debugPrint('WM: REGISTER START');
 
+    final response = await http.post(
+      Uri.parse('$baseUrl/register'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'username': username,
+        'password': password,
+      }),
+    ).timeout(const Duration(seconds: 30));
+
+    debugPrint('WM: REGISTER RESPONSE ${response.statusCode}');
     return _decode(response);
   }
 
@@ -27,16 +29,18 @@ class ApiService {
     String username,
     String password,
   ) async {
-    final response = await http
-        .post(
-          Uri.parse('$baseUrl/login'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'username': username,
-            'password': password,
-          }),
-        )
-        .timeout(const Duration(seconds: 15));
+    debugPrint('WM: LOGIN START');
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/login'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'username': username,
+        'password': password,
+      }),
+    ).timeout(const Duration(seconds: 30));
+
+    debugPrint('WM: LOGIN RESPONSE ${response.statusCode}');
 
     final data = _decode(response);
     final token = data['token'];
@@ -45,27 +49,33 @@ class ApiService {
       throw Exception('Сервер не вернул токен');
     }
 
+    debugPrint('WM: TOKEN RECEIVED');
     final prefs = await SharedPreferences.getInstance();
+    debugPrint('WM: PREFERENCES READY');
+
     await prefs.setString('auth_token', token);
+    debugPrint('WM: TOKEN SAVED');
 
     return data;
   }
 
   static Future<List<Map<String, dynamic>>> getChats() async {
+    debugPrint('WM: GET CHATS START');
+
     final token = await getToken();
 
     if (token == null || token.isEmpty) {
       throw Exception('Необходимо войти в аккаунт');
     }
 
-    final response = await http
-        .get(
-          Uri.parse('$baseUrl/chats'),
-          headers: {
-            'Authorization': 'Bearer $token',
-          },
-        )
-        .timeout(const Duration(seconds: 15));
+    debugPrint('WM: TOKEN FOUND');
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/chats'),
+      headers: {'Authorization': 'Bearer $token'},
+    ).timeout(const Duration(seconds: 30));
+
+    debugPrint('WM: CHATS RESPONSE ${response.statusCode}');
 
     final data = _decode(response);
     final chats = data['chats'];
@@ -74,9 +84,8 @@ class ApiService {
       throw Exception('Некорректный список чатов');
     }
 
-    return chats
-        .whereType<Map<String, dynamic>>()
-        .toList();
+    debugPrint('WM: CHATS LOADED: ${chats.length}');
+    return chats.whereType<Map<String, dynamic>>().toList();
   }
 
   static Future<String?> getToken() async {
