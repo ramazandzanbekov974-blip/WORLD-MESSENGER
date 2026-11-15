@@ -1,4 +1,4 @@
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import secrets
 import re
@@ -11,10 +11,13 @@ from messaging import create_chat, send_message, get_messages, get_chats
 sessions = {}
 
 class MessengerHandler(BaseHTTPRequestHandler):
+    protocol_version = 'HTTP/1.1'
 
     def send_json(self, data, status=200):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+        self.close_connection = True
         self.send_response(status)
+        self.send_header("Connection", "close")
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -209,6 +212,6 @@ class MessengerHandler(BaseHTTPRequestHandler):
         self.send_json({"error": "Not found"}, 404)
 
 
-server = HTTPServer(("127.0.0.1", 8000), MessengerHandler)
+server = ThreadingHTTPServer(("0.0.0.0", 8000), MessengerHandler)
 print("WORLD MESSENGER SERVER STARTED")
 server.serve_forever()
