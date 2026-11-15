@@ -71,6 +71,15 @@ class _LoginScreenState extends State<LoginScreen> {
               const Icon(Icons.public, size: 75, color: Color(0xFF00E5D4)),
               const SizedBox(height: 25),
               const Text(
+                'TCP TEST 2 — НОВАЯ СБОРКА',
+                style: TextStyle(
+                  color: Colors.orange,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
                 'С возвращением!',
                 style: TextStyle(fontSize: 27, fontWeight: FontWeight.bold),
               ),
