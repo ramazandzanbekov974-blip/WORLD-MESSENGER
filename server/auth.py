@@ -43,8 +43,8 @@ def register_user(username, password):
     try:
         with get_connection() as conn:
             conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, password_hash)
+                "INSERT INTO users (username, password_hash, display_name) VALUES (?, ?, ?)",
+                (username, password_hash, username)
             )
         return True, "Account created"
     except Exception as error:
@@ -55,7 +55,13 @@ def register_user(username, password):
 def login_user(username, password):
     with get_connection() as conn:
         user = conn.execute(
-            "SELECT id, username, password_hash FROM users WHERE username = ?",
+            """
+            SELECT id, username, display_name, phone,
+                   phone_verified, bio, avatar, phone_visible,
+                   password_hash
+            FROM users
+            WHERE username = ?
+            """,
             (username.strip(),)
         ).fetchone()
 
@@ -64,5 +70,11 @@ def login_user(username, password):
 
     return {
         "id": user["id"],
-        "username": user["username"]
+        "username": user["username"],
+        "display_name": user["display_name"],
+        "phone": user["phone"],
+        "phone_verified": bool(user["phone_verified"]),
+        "bio": user["bio"],
+        "avatar": user["avatar"],
+        "phone_visible": bool(user["phone_visible"])
     }

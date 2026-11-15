@@ -7,6 +7,7 @@ from urllib.parse import urlsplit
 
 from auth import register_user, login_user
 from messaging import create_chat, send_message, get_messages, get_chats
+from database import get_connection
 
 sessions = {}
 
@@ -73,7 +74,25 @@ class MessengerHandler(BaseHTTPRequestHandler):
             if not user:
                 self.send_json({"error": "Unauthorized"}, 401)
                 return
-            self.send_json({"user": user})
+
+            with get_connection() as conn:
+                row = conn.execute(
+                    """
+                    SELECT id, username, display_name, phone,
+                           phone_verified, bio, avatar, phone_visible
+                    FROM users WHERE id = ?
+                    """,
+                    (user["id"],)
+                ).fetchone()
+
+            if row is None:
+                self.send_json({"error": "User not found"}, 404)
+                return
+
+            profile = dict(row)
+            profile["phone_verified"] = bool(profile["phone_verified"])
+            profile["phone_visible"] = bool(profile["phone_visible"])
+            self.send_json({"user": profile})
 
         elif path == "/chats":
             user = self.current_user()
@@ -163,6 +182,93 @@ class MessengerHandler(BaseHTTPRequestHandler):
 
         data = self.read_json()
         if data is None:
+            return
+
+        if path == "/profile":
+            username = data.get("username")
+            display_name = data.get("display_name")
+            phone = data.get("phone")
+            bio = data.get("bio")
+
+            if not all(isinstance(v, str) for v in
+                       (username, display_name, phone, bio)):
+                self.send_json({"error": "Все поля профиля должны быть текстом"}, 400)
+                return
+
+            username = username.strip()
+            display_name = display_name.strip()
+            phone = phone.strip()
+            bio = bio.strip()
+
+            if not re.fullmatch(r"[A-Za-z0-9_]{3,24}", username):
+                self.send_json({"error": "Username: 3-24 символа, только латиница, цифры и _"}, 400)
+                return
+
+            if not display_name or len(display_name) > 40:
+                self.send_json({"error": "Имя должно содержать от 1 до 40 символов"}, 400)
+                return
+
+            if len(phone) > 25 or (phone and not re.fullmatch(r"[+0-9 ()-]{5,25}", phone)):
+                self.send_json({"error": "Проверь формат номера телефона"}, 400)
+                return
+
+            if len(bio) > 160:
+                self.send_json({"error": "Описание не должно превышать 160 символов"}, 400)
+                return
+
+            try:
+                with get_connection() as conn:
+                    duplicate_username = conn.execute(
+                        "SELECT id FROM users WHERE username = ? COLLATE NOCASE AND id != ?",
+                        (username, user["id"])
+                    ).fetchone()
+
+                    if duplicate_username:
+                        self.send_json({"error": "Этот username уже занят"}, 409)
+                        return
+
+                    if phone:
+                        duplicate_phone = conn.execute(
+                            "SELECT id FROM users WHERE phone = ? AND id != ?",
+                            (phone, user["id"])
+                        ).fetchone()
+                        if duplicate_phone:
+                            self.send_json({"error": "Этот номер уже добавлен в другой профиль"}, 409)
+                            return
+
+                    conn.execute(
+                        """
+                        UPDATE users
+                        SET username = ?, display_name = ?, phone = ?, bio = ?
+                        WHERE id = ?
+                        """,
+                        (username, display_name, phone or None, bio, user["id"])
+                    )
+
+                    row = conn.execute(
+                        """
+                        SELECT id, username, display_name, phone,
+                               phone_verified, bio, avatar, phone_visible
+                        FROM users WHERE id = ?
+                        """,
+                        (user["id"],)
+                    ).fetchone()
+
+                profile = dict(row)
+                profile["phone_verified"] = bool(profile["phone_verified"])
+                profile["phone_visible"] = bool(profile["phone_visible"])
+
+                token = self.headers.get("Authorization", "")[7:].strip()
+                sessions[token] = {
+                    key: profile[key]
+                    for key in ("id", "username", "display_name", "phone",
+                                "phone_verified", "bio", "avatar", "phone_visible")
+                }
+
+                self.send_json({"success": True, "user": profile})
+            except Exception as error:
+                print("PROFILE UPDATE ERROR:", repr(error), flush=True)
+                self.send_json({"error": "Не удалось обновить профиль"}, 500)
             return
 
         if path == "/chats":

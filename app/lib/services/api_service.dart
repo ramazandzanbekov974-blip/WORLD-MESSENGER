@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.0.16:8000';
+  static const String baseUrl = 'http://127.0.0.1:8000';
 
   static Future<Map<String, dynamic>> _request(
     String method,
@@ -29,7 +29,10 @@ class ApiService {
       } else {
         response = await http.post(
           uri,
-          headers: {'Content-Type': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            if (token != null) 'Authorization': 'Bearer $token',
+          },
           body: jsonEncode(body ?? {}),
         ).timeout(const Duration(seconds: 20));
       }
@@ -110,6 +113,56 @@ class ApiService {
 
     debugPrint('WM: TOKEN SAVED');
     return data;
+  }
+
+  static Future<Map<String, dynamic>> getProfile() async {
+    final token = await getToken();
+
+    if (token == null || token.isEmpty) {
+      throw Exception('Необходимо войти в аккаунт');
+    }
+
+    final data = await _request('GET', '/me', token: token);
+    final user = data['user'];
+
+    if (user is! Map<String, dynamic>) {
+      throw Exception('Некорректный профиль');
+    }
+
+    return user;
+  }
+
+  static Future<Map<String, dynamic>> updateProfile({
+    required String username,
+    required String displayName,
+    required String phone,
+    required String bio,
+  }) async {
+    final token = await getToken();
+
+    if (token == null || token.isEmpty) {
+      throw Exception('Необходимо войти в аккаунт');
+    }
+
+    final data = await _request(
+      'POST',
+      '/profile',
+      token: token,
+      body: {
+        'username': username,
+        'display_name': displayName,
+        'phone': phone,
+        'bio': bio,
+      },
+    );
+
+    final user = data['user'];
+
+    if (user is! Map<String, dynamic>) {
+      throw Exception('Сервер не вернул обновлённый профиль');
+    }
+
+    return user;
   }
 
   static Future<List<Map<String, dynamic>>> getChats() async {

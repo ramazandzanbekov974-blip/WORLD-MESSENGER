@@ -49,6 +49,32 @@ def init_db():
             )
         """)
 
+        columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(users)").fetchall()
+        }
+
+        new_columns = {
+            "display_name": "TEXT NOT NULL DEFAULT ''",
+            "phone": "TEXT",
+            "phone_verified": "INTEGER NOT NULL DEFAULT 0",
+            "bio": "TEXT NOT NULL DEFAULT ''",
+            "avatar": "TEXT",
+            "phone_visible": "INTEGER NOT NULL DEFAULT 0"
+        }
+
+        for name, definition in new_columns.items():
+            if name not in columns:
+                conn.execute(
+                    f"ALTER TABLE users ADD COLUMN {name} {definition}"
+                )
+
+        conn.execute("""
+            UPDATE users
+            SET display_name = username
+            WHERE display_name = ''
+        """)
+
         conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_messages_chat
             ON messages(chat_id, id)

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String username;
@@ -82,6 +83,17 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: loadChats,
             icon: const Icon(Icons.refresh),
             tooltip: 'Обновить',
+          ),
+          IconButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ProfileScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.person_outline),
+            tooltip: 'Мой профиль',
           ),
           IconButton(
             onPressed: logout,
