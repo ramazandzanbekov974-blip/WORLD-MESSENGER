@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -109,6 +111,143 @@ class ApiService {
   static Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
+  }
+
+
+  static Future<String> debugTcpLogin(
+    String username,
+    String password,
+  ) async {
+    const host = '192.168.0.16';
+    const port = 8000;
+
+    Socket? socket;
+    StreamSubscription? subscription;
+    final result = Completer<String>();
+    final buffer = <int>[];
+
+    int findHeaderEnd(List<int> bytes) {
+      for (var i = 0; i <= bytes.length - 4; i++) {
+        if (bytes[i] == 13 &&
+            bytes[i + 1] == 10 &&
+            bytes[i + 2] == 13 &&
+            bytes[i + 3] == 10) {
+          return i;
+        }
+      }
+      return -1;
+    }
+
+    try {
+      final connected = await Socket.connect(
+        host,
+        port,
+        timeout: const Duration(seconds: 5),
+      );
+      socket = connected;
+
+      subscription = connected.listen(
+        (chunk) {
+          if (result.isCompleted) return;
+
+          buffer.addAll(chunk);
+          final headerEnd = findHeaderEnd(buffer);
+          if (headerEnd < 0) return;
+
+          final headerText = ascii.decode(
+            buffer.sublist(0, headerEnd),
+            allowInvalid: true,
+          );
+
+          final match = RegExp(
+            r'Content-Length:\s*(\d+)',
+            caseSensitive: false,
+          ).firstMatch(headerText);
+
+          if (match == null) {
+            result.completeError(
+              Exception('В ответе нет Content-Length'),
+            );
+            return;
+          }
+
+          final contentLength = int.parse(match.group(1)!);
+          final bodyStart = headerEnd + 4;
+
+          if (buffer.length < bodyStart + contentLength) return;
+
+          final bodyBytes = buffer.sublist(
+            bodyStart,
+            bodyStart + contentLength,
+          );
+
+          final statusLine = headerText.split('\r\n').first;
+          var jsonValid = false;
+          var success = false;
+          var tokenPresent = false;
+
+          try {
+            final decoded = jsonDecode(
+              utf8.decode(bodyBytes, allowMalformed: true),
+            );
+
+            if (decoded is Map) {
+              jsonValid = true;
+              success = decoded['success'] == true;
+              final token = decoded['token'];
+              tokenPresent = token is String && token.isNotEmpty;
+            }
+          } catch (_) {
+            jsonValid = false;
+          }
+
+          result.complete(
+            '$statusLine\n'
+            'Получено байтов: ${buffer.length}\n'
+            'JSON корректен: $jsonValid\n'
+            'Успешный вход: $success\n'
+            'Токен присутствует: $tokenPresent',
+          );
+        },
+        onError: (Object error) {
+          if (!result.isCompleted) result.completeError(error);
+        },
+        onDone: () {
+          if (!result.isCompleted) {
+            result.completeError(
+              Exception('Соединение закрылось до полного ответа'),
+            );
+          }
+        },
+      );
+
+      final bodyBytes = utf8.encode(
+        jsonEncode({
+          'username': username,
+          'password': password,
+        }),
+      );
+
+      final headers = utf8.encode(
+        'POST /login HTTP/1.1\r\n'
+        'Host: $host:$port\r\n'
+        'Content-Type: application/json\r\n'
+        'Content-Length: ${bodyBytes.length}\r\n'
+        'Connection: close\r\n'
+        '\r\n',
+      );
+
+      connected.add(headers);
+      connected.add(bodyBytes);
+      await connected.flush().timeout(const Duration(seconds: 10));
+
+      return await result.future.timeout(
+        const Duration(seconds: 10),
+      );
+    } finally {
+      await subscription?.cancel();
+      socket?.destroy();
+    }
   }
 
   static Map<String, dynamic> _decode(http.Response response) {

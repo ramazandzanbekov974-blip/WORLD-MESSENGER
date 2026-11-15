@@ -41,29 +41,10 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      setState(() => diagnostic = 'Подключаемся и проверяем авторизацию...');
-
-      final data = await ApiService.login(username, password);
-
+      setState(() => diagnostic = 'TCP: подключаемся к серверу...');
+      final result = await ApiService.debugTcpLogin(username, password);
       if (!mounted) return;
-      setState(() => diagnostic = 'Этап 2: ответ получен, токен сохранён');
-
-      final user = data['user'];
-      final name = user is Map
-          ? user['username']?.toString() ?? username
-          : username;
-
-      await Future.delayed(const Duration(milliseconds: 500));
-      if (!mounted) return;
-
-      setState(() => diagnostic = 'Этап 3: переход в список чатов');
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => HomeScreen(username: name),
-        ),
-      );
+      setState(() => diagnostic = result);
     } catch (e) {
       if (!mounted) return;
       setState(() => diagnostic = 'ОШИБКА: $e');

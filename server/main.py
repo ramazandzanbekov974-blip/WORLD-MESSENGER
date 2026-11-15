@@ -15,13 +15,13 @@ class MessengerHandler(BaseHTTPRequestHandler):
 
     def send_json(self, data, status=200):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
-        self.close_connection = True
         self.send_response(status)
         self.send_header("Connection", "close")
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+        self.wfile.flush()
 
     def read_json(self):
         if not self.headers.get("Content-Type", "").startswith("application/json"):
