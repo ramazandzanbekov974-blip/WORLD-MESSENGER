@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'home_screen.dart';
@@ -37,22 +38,44 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() {
       loading = true;
-      diagnostic = 'Этап 1: отправка запроса на сервер';
+      diagnostic = 'Подключение к серверу...';
     });
 
     try {
-      setState(() => diagnostic = 'TCP: подключаемся к серверу...');
-      final result = await ApiService.debugTcpLogin(username, password);
+      final result = await ApiService.login(username, password);
+
       if (!mounted) return;
-      setState(() => diagnostic = result);
+
+      final user = result['user'];
+      final serverUsername = user is Map
+          ? user['username']?.toString() ?? username
+          : username;
+
+      setState(() {
+        diagnostic = 'Вход выполнен';
+      });
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => HomeScreen(username: serverUsername),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
-      setState(() => diagnostic = 'ОШИБКА: $e');
+
+      final message = e.toString().replaceFirst('Exception: ', '');
+
+      setState(() {
+        diagnostic = 'Ошибка входа';
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        SnackBar(content: Text(message)),
       );
     } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted) {
+        setState(() => loading = false);
+      }
     }
   }
 
@@ -68,20 +91,18 @@ class _LoginScreenState extends State<LoginScreen> {
           padding: const EdgeInsets.all(28),
           child: Column(
             children: [
-              const Icon(Icons.public, size: 75, color: Color(0xFF00E5D4)),
+              const Icon(
+                Icons.public,
+                size: 75,
+                color: Color(0xFF00E5D4),
+              ),
               const SizedBox(height: 25),
               const Text(
-                'TCP TEST 2 — НОВАЯ СБОРКА',
+                'С возвращением!',
                 style: TextStyle(
-                  color: Colors.orange,
-                  fontSize: 16,
+                  fontSize: 27,
                   fontWeight: FontWeight.bold,
                 ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'С возвращением!',
-                style: TextStyle(fontSize: 27, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 35),
               TextField(
@@ -105,7 +126,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       setState(() => hidePassword = !hidePassword);
                     },
                     icon: Icon(
-                      hidePassword ? Icons.visibility : Icons.visibility_off,
+                      hidePassword
+                          ? Icons.visibility
+                          : Icons.visibility_off,
                     ),
                   ),
                 ),
@@ -125,7 +148,9 @@ class _LoginScreenState extends State<LoginScreen> {
               Text(
                 diagnostic,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Color(0xFF00E5D4)),
+                style: const TextStyle(
+                  color: Color(0xFF00E5D4),
+                ),
               ),
             ],
           ),
