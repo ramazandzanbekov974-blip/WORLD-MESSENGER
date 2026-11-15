@@ -41,6 +41,12 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
+      setState(() => diagnostic = 'Проверяем связь с сервером...');
+      await ApiService.checkHealth();
+
+      if (!mounted) return;
+      setState(() => diagnostic = 'Сервер доступен. Проверяем авторизацию...');
+
       final data = await ApiService.login(username, password);
 
       if (!mounted) return;

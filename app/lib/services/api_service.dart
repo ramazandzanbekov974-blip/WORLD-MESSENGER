@@ -6,6 +6,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ApiService {
   static const String baseUrl = 'http://127.0.0.1:8000';
 
+  static Future<void> checkHealth() async {
+    debugPrint('WM: HEALTH START');
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/health'),
+    ).timeout(const Duration(seconds: 5));
+
+    debugPrint('WM: HEALTH RESPONSE ${response.statusCode}');
+    _decode(response);
+  }
+
   static Future<Map<String, dynamic>> register(
     String username,
     String password,
